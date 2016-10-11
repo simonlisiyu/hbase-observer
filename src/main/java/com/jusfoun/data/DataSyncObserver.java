@@ -15,12 +15,11 @@ import org.apache.hadoop.hbase.coprocessor.ObserverContext;
 import org.apache.hadoop.hbase.coprocessor.RegionCoprocessorEnvironment;
 import org.apache.hadoop.hbase.regionserver.wal.WALEdit;
 import org.apache.hadoop.hbase.util.Bytes;
+import org.elasticsearch.action.index.IndexRequest;
 import org.elasticsearch.client.Client;
 
 import java.io.IOException;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 //import org.elasticsearch.client.transport.TransportClient;
 //import org.elasticsearch.common.settings.ImmutableSettings;
@@ -65,20 +64,53 @@ public class DataSyncObserver extends BaseRegionObserver {
 
     @Override
     public void postPut(ObserverContext<RegionCoprocessorEnvironment> e, Put put, WALEdit edit, Durability durability) throws IOException {
+        /**
+         * 原方法调用ElasticSearchOperator,没有通过IK创建中文索引。
+         */
+//        try {
+//            String indexId = new String(put.getRow());
+//            Map<byte[], List<Cell>> familyMap = put.getFamilyCellMap();
+////            NavigableMap<byte[], List<Cell>> familyMap = put.getFamilyCellMap();
+//            Map<String, Object> json = new HashMap<String, Object>();
+//            for (Map.Entry<byte[], List<Cell>> entry : familyMap.entrySet()) {
+//                for (Cell cell : entry.getValue()) {
+//                    String key = Bytes.toString(CellUtil.cloneQualifier(cell));
+//                    String value = Bytes.toString(CellUtil.cloneValue(cell));
+//                    json.put(key, value);
+//                }
+//            }
+//            System.out.println();
+//            ElasticSearchOperator.addUpdateBuilderToBulk(client.prepareUpdate(Config.indexName, Config.typeName, indexId).setDoc(json).setUpsert(json));
+//            LOG.info("observer -- add new doc: " + indexId + " to type: " + Config.typeName);
+//        } catch (Exception ex) {
+//            LOG.error(ex);
+//        }
+
+        /**
+         * 新方法调用ElasticSearchBulkProcessor,通过IK创建中文索引。
+         */
         try {
             String indexId = new String(put.getRow());
-            Map<byte[], List<Cell>> familyMap = put.getFamilyCellMap();
-//            NavigableMap<byte[], List<Cell>> familyMap = put.getFamilyCellMap();
-            Map<String, Object> json = new HashMap<String, Object>();
-            for (Map.Entry<byte[], List<Cell>> entry : familyMap.entrySet()) {
-                for (Cell cell : entry.getValue()) {
+            NavigableMap familyMap = put.getFamilyCellMap();
+            HashSet set = new HashSet();
+            HashMap json = new HashMap();
+            Iterator mapIterator = familyMap.entrySet().iterator();
+
+            while(mapIterator.hasNext()) {
+                Map.Entry entry = (Map.Entry)mapIterator.next();
+                Iterator valueIterator = ((List)entry.getValue()).iterator();
+
+                while(valueIterator.hasNext()) {
+                    Cell cell = (Cell)valueIterator.next();
                     String key = Bytes.toString(CellUtil.cloneQualifier(cell));
                     String value = Bytes.toString(CellUtil.cloneValue(cell));
                     json.put(key, value);
+                    set.add(key);
                 }
             }
+
             System.out.println();
-            ElasticSearchOperator.addUpdateBuilderToBulk(client.prepareUpdate(Config.indexName, Config.typeName, indexId).setDoc(json).setUpsert(json));
+            ElasticSearchBulkProcessor.addIndexRequestToBulkProcessor((new IndexRequest(Config.indexName, Config.typeName, indexId)).source(json), set);
             LOG.info("observer -- add new doc: " + indexId + " to type: " + Config.typeName);
         } catch (Exception ex) {
             LOG.error(ex);

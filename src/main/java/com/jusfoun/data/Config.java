@@ -31,9 +31,9 @@ public class Config {
     }
 
     public static void main(String[] args) {
-//        Config.clusterName = "elasticsearch";
-//        Config.nodeHost = "localhost";
-//        Config.nodePort = 9300;
+        Config.clusterName = "elasticsearch";
+        Config.nodeHost = "localhost";
+        Config.nodePort = 9300;
 
         System.out.println(Config.getInfo());
     }
