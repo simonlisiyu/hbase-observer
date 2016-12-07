@@ -1,4 +1,4 @@
-package com.jusfoun.data;
+package com.lsy.hbase.observer;
 
 import org.elasticsearch.client.Client;
 import org.elasticsearch.client.transport.TransportClient;

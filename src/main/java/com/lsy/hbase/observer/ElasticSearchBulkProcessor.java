@@ -1,4 +1,4 @@
-package com.jusfoun.data;
+package com.lsy.hbase.observer;
 
 import org.elasticsearch.action.admin.indices.exists.indices.IndicesExistsRequest;
 import org.elasticsearch.action.admin.indices.mapping.put.PutMappingRequest;
@@ -28,9 +28,9 @@ public class ElasticSearchBulkProcessor {
     // 缓冲池容量(计数,request)
     private static final int MAX_BULK_COUNT = 1000;
     // 缓冲池容量（大小,MB）
-    private static final int MAX_BULK_SIZE = 1024;
+    private static final int MAX_BULK_SIZE = 1;
     // 最大提交间隔（秒）
-    private static final int MAX_COMMIT_INTERVAL = 60 * 1;
+    private static final int MAX_COMMIT_INTERVAL = 60 * 2;
     // 最大并发数量
     private static final int MAX_CONCURRENT_REQUEST = 2;
     // 失败重试等待时间 (ms)
@@ -105,26 +105,55 @@ public class ElasticSearchBulkProcessor {
             System.out.println("index: '"+index+"' is exist!");
             new XContentFactory();
             XContentBuilder builder=XContentFactory.jsonBuilder()
-                    .startObject()//注意不要加index和type
-                    .startObject("properties")
-                    .startObject("id").field("type", "string").field("store", "yes").endObject();
+                    .startObject()//注意不要加index和type startObject()_1
+//                    .startObject("_ttl")    // startObject("_ttl")
+//                    .field("enabled",true)  // 启用索引过期设置
+//                    .field("default","1m") // 默认过期时间
+//                    .endObject()    // endObject()_("_ttl")
+                    .startObject("properties") //startObject()_("properties")
+//                    .startObject("id").field("type", "string").field("store", "yes").endObject()
+                    ;
             for(String field : fieldSet){
-                builder = builder.startObject(field).field("type", "string").field("store", "yes").field("analyzer", "ik").endObject();
+                builder = builder.startObject(field).field("type", "string").field("store", "yes")
+//                        .field("analyzer", "ik") // 是否启用分词, 和分词插件名称
+                        .endObject();
             }
-            builder = builder.endObject().endObject();
+            builder = builder.endObject(); // endObject()_("properties")
+            builder = builder.endObject();   // endObject()_1
 
             PutMappingRequest mapping = Requests.putMappingRequest(index).type(mappingType).source(builder);
             client.admin().indices().putMapping(mapping).actionGet();
 
-        } else {
+//            // You can also provide the type in the source document
+//            client.admin().indices().preparePutMapping("twitter")
+//                    .setType("user")
+//                    .setSource("{\n" +
+//                            "    \"user\":{\n" +
+//                            "        \"properties\": {\n" +
+//                            "            \"name\": {\n" +
+//                            "                \"type\": \"string\"\n" +
+//                            "            }\n" +
+//                            "        }\n" +
+//                            "    }\n" +
+//                            "}")
+//                    .get();
+
+        }
+        else {
             System.out.println("create index: '"+index+"'!");
             new XContentFactory();
             XContentBuilder builder=XContentFactory.jsonBuilder()
                     .startObject()//注意不要加index和type
+                    .startObject("_ttl")    // startObject("_ttl")
+                    .field("enabled",true)  // 启用索引过期设置
+                    .field("default","1m") // 默认过期时间
+                    .endObject()    // endObject()_("_ttl")
                     .startObject("properties")
                     .startObject("id").field("type", "string").field("store", "yes").endObject();
             for(String field : fieldSet){
-                builder = builder.startObject(field).field("type", "string").field("store", "yes").field("analyzer", "ik").endObject();
+                builder = builder.startObject(field).field("type", "string").field("store", "yes")
+//                        .field("analyzer", "ik")
+                        .endObject();
             }
             builder = builder.endObject().endObject();
 

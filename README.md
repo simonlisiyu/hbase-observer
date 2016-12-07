@@ -2,8 +2,8 @@
 hbase coprocessor observer, to elasticsearch
 
 ## 环境
-- Hadoop 2.5.2
-- HBase 1.2.2 
+- Hadoop 2.6.0(2.5.2)
+- HBase 1.1.5(1.2.2)
 - ElasticSearch 2.3.5
 
 ## 使用Maven打包

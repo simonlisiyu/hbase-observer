@@ -1,4 +1,4 @@
-package com.jusfoun.data;
+package com.lsy.hbase.observer;
 
 import junit.framework.Test;
 import junit.framework.TestCase;

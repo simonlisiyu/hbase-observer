@@ -1,4 +1,4 @@
-package com.jusfoun.data;
+package com.lsy.hbase.observer;
 
 
 import org.elasticsearch.action.bulk.BulkRequestBuilder;
@@ -22,9 +22,9 @@ import java.util.concurrent.locks.ReentrantLock;
 public class ElasticSearchOperator {
 
     // 缓冲池容量
-    private static final int MAX_BULK_COUNT = 10;
+    private static final int MAX_BULK_COUNT = 1000;
     // 最大提交间隔（秒）
-    private static final int MAX_COMMIT_INTERVAL = 60 * 5;
+    private static final int MAX_COMMIT_INTERVAL = 60 * 2;
 
     private static Client client = null;
     private static BulkRequestBuilder bulkRequestBuilder = null;

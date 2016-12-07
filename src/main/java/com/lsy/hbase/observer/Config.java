@@ -1,4 +1,4 @@
-package com.jusfoun.data;
+package com.lsy.hbase.observer;
 
 import org.apache.commons.lang.StringUtils;
 
@@ -31,8 +31,8 @@ public class Config {
     }
 
     public static void main(String[] args) {
-        Config.clusterName = "elasticsearch";
-        Config.nodeHost = "localhost";
+        Config.clusterName = "lsy-cluster";
+        Config.nodeHost = "192.168.5.131";
         Config.nodePort = 9300;
 
         System.out.println(Config.getInfo());
