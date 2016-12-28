@@ -7,14 +7,13 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.CellUtil;
 import org.apache.hadoop.hbase.CoprocessorEnvironment;
-import org.apache.hadoop.hbase.client.Delete;
-import org.apache.hadoop.hbase.client.Durability;
-import org.apache.hadoop.hbase.client.Put;
+import org.apache.hadoop.hbase.client.*;
 import org.apache.hadoop.hbase.coprocessor.BaseRegionObserver;
 import org.apache.hadoop.hbase.coprocessor.ObserverContext;
 import org.apache.hadoop.hbase.coprocessor.RegionCoprocessorEnvironment;
 import org.apache.hadoop.hbase.regionserver.wal.WALEdit;
 import org.apache.hadoop.hbase.util.Bytes;
+import org.elasticsearch.action.index.IndexRequest;
 import org.elasticsearch.client.Client;
 
 import java.io.IOException;
@@ -60,6 +59,28 @@ public class DataSyncObserver extends BaseRegionObserver {
         client = MyTransportClient.client;
     }
 
+    @Override
+    public Result postAppend(ObserverContext<RegionCoprocessorEnvironment> e, Append append, Result result) throws IOException {
+        try {
+            String indexId = new String(append.getRow());
+            Map<byte[], List<Cell>> familyMap = append.getFamilyCellMap();
+//            NavigableMap<byte[], List<Cell>> familyMap = put.getFamilyCellMap();
+            Map<String, Object> json = new HashMap<String, Object>();
+            for (Map.Entry<byte[], List<Cell>> entry : familyMap.entrySet()) {
+                for (Cell cell : entry.getValue()) {
+                    String key = Bytes.toString(CellUtil.cloneQualifier(cell));
+                    String value = Bytes.toString(CellUtil.cloneValue(cell));
+                    json.put(key, value);
+                }
+            }
+//            System.out.println("postAppend");
+            ElasticSearchOperator.addUpdateBuilderToBulk(client.prepareUpdate(Config.indexName, Config.typeName, indexId).setDoc(json).setUpsert(json));
+            LOG.info("observer -- add new doc: " + indexId + " to type: " + Config.typeName);
+        } catch (Exception ex) {
+            LOG.error(ex);
+        }
+        return result;
+    }
 
     @Override
     public void postPut(ObserverContext<RegionCoprocessorEnvironment> e, Put put, WALEdit edit, Durability durability) throws IOException {
@@ -78,7 +99,7 @@ public class DataSyncObserver extends BaseRegionObserver {
                     json.put(key, value);
                 }
             }
-            System.out.println();
+//            System.out.println("postPut");
             ElasticSearchOperator.addUpdateBuilderToBulk(client.prepareUpdate(Config.indexName, Config.typeName, indexId).setDoc(json).setUpsert(json));
             LOG.info("observer -- add new doc: " + indexId + " to type: " + Config.typeName);
         } catch (Exception ex) {

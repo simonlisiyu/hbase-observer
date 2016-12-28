@@ -22,7 +22,8 @@ import java.util.concurrent.locks.ReentrantLock;
 public class ElasticSearchOperator {
 
     // 缓冲池容量
-    private static final int MAX_BULK_COUNT = 1000;
+    private static final int MAX_BULK_COUNT = 2;
+//    private static final int MAX_BULK_COUNT = 1000;
     // 最大提交间隔（秒）
     private static final int MAX_COMMIT_INTERVAL = 60 * 2;
 
