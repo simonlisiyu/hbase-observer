@@ -14,6 +14,7 @@ import org.apache.hadoop.hbase.coprocessor.RegionCoprocessorEnvironment;
 import org.apache.hadoop.hbase.regionserver.wal.WALEdit;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.elasticsearch.action.index.IndexRequest;
+import org.elasticsearch.action.update.UpdateRequest;
 import org.elasticsearch.client.Client;
 
 import java.io.IOException;
@@ -87,54 +88,55 @@ public class DataSyncObserver extends BaseRegionObserver {
         /**
          * 原方法调用ElasticSearchOperator,没有通过IK创建中文索引。
          */
-        try {
-            String indexId = new String(put.getRow());
-            Map<byte[], List<Cell>> familyMap = put.getFamilyCellMap();
-//            NavigableMap<byte[], List<Cell>> familyMap = put.getFamilyCellMap();
-            Map<String, Object> json = new HashMap<String, Object>();
-            for (Map.Entry<byte[], List<Cell>> entry : familyMap.entrySet()) {
-                for (Cell cell : entry.getValue()) {
-                    String key = Bytes.toString(CellUtil.cloneQualifier(cell));
-                    String value = Bytes.toString(CellUtil.cloneValue(cell));
-                    json.put(key, value);
-                }
-            }
-//            System.out.println("postPut");
-            ElasticSearchOperator.addUpdateBuilderToBulk(client.prepareUpdate(Config.indexName, Config.typeName, indexId).setDoc(json).setUpsert(json));
-            LOG.info("observer -- add new doc: " + indexId + " to type: " + Config.typeName);
-        } catch (Exception ex) {
-            LOG.error(ex);
-        }
-
-        /**
-         * 新方法调用ElasticSearchBulkProcessor,通过IK创建中文索引。
-         */
 //        try {
 //            String indexId = new String(put.getRow());
-//            NavigableMap familyMap = put.getFamilyCellMap();
-//            HashSet set = new HashSet();
-//            HashMap json = new HashMap();
-//            Iterator mapIterator = familyMap.entrySet().iterator();
-//
-//            while(mapIterator.hasNext()) {
-//                Map.Entry entry = (Map.Entry)mapIterator.next();
-//                Iterator valueIterator = ((List)entry.getValue()).iterator();
-//
-//                while(valueIterator.hasNext()) {
-//                    Cell cell = (Cell)valueIterator.next();
+//            Map<byte[], List<Cell>> familyMap = put.getFamilyCellMap();
+////            NavigableMap<byte[], List<Cell>> familyMap = put.getFamilyCellMap();
+//            Map<String, Object> json = new HashMap<String, Object>();
+//            for (Map.Entry<byte[], List<Cell>> entry : familyMap.entrySet()) {
+//                for (Cell cell : entry.getValue()) {
 //                    String key = Bytes.toString(CellUtil.cloneQualifier(cell));
 //                    String value = Bytes.toString(CellUtil.cloneValue(cell));
 //                    json.put(key, value);
-//                    set.add(key);
 //                }
 //            }
-//
-//            System.out.println();
-//            ElasticSearchBulkProcessor.addIndexRequestToBulkProcessor((new IndexRequest(Config.indexName, Config.typeName, indexId)).source(json), set);
+////            System.out.println("postPut");
+//            ElasticSearchOperator.addUpdateBuilderToBulk(client.prepareUpdate(Config.indexName, Config.typeName, indexId).setDoc(json).setUpsert(json));
 //            LOG.info("observer -- add new doc: " + indexId + " to type: " + Config.typeName);
 //        } catch (Exception ex) {
 //            LOG.error(ex);
 //        }
+
+        /**
+         * 新方法调用ElasticSearchBulkProcessor,通过IK创建中文索引。
+         */
+        try {
+            String indexId = new String(put.getRow());
+            NavigableMap familyMap = put.getFamilyCellMap();
+            HashSet set = new HashSet();
+            HashMap json = new HashMap();
+            Iterator mapIterator = familyMap.entrySet().iterator();
+
+            while(mapIterator.hasNext()) {
+                Map.Entry entry = (Map.Entry)mapIterator.next();
+                Iterator valueIterator = ((List)entry.getValue()).iterator();
+
+                while(valueIterator.hasNext()) {
+                    Cell cell = (Cell)valueIterator.next();
+                    String key = Bytes.toString(CellUtil.cloneQualifier(cell));
+                    String value = Bytes.toString(CellUtil.cloneValue(cell));
+                    json.put(key, value);
+                    set.add(key);
+                }
+            }
+
+            System.out.println();
+//            ElasticSearchBulkProcessor.addIndexRequestToBulkProcessor((new IndexRequest(Config.indexName, Config.typeName, indexId)).source(json), set);
+            ElasticSearchBulkProcessor.addIndexRequestToBulkProcessor((new UpdateRequest(Config.indexName, Config.typeName, indexId)).doc(json), set);
+            LOG.info("observer -- add new doc: " + indexId + " to type: " + Config.typeName);
+        } catch (Exception ex) {
+            LOG.error(ex);
+        }
     }
 
     @Override

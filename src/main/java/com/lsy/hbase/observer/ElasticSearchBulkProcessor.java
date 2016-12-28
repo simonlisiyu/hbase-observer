@@ -7,6 +7,7 @@ import org.elasticsearch.action.bulk.BulkProcessor;
 import org.elasticsearch.action.bulk.BulkRequest;
 import org.elasticsearch.action.bulk.BulkResponse;
 import org.elasticsearch.action.index.IndexRequest;
+import org.elasticsearch.action.update.UpdateRequest;
 import org.elasticsearch.client.Client;
 import org.elasticsearch.client.Requests;
 import org.elasticsearch.common.unit.ByteSizeUnit;
@@ -15,6 +16,7 @@ import org.elasticsearch.common.unit.TimeValue;
 import org.elasticsearch.common.xcontent.XContentBuilder;
 import org.elasticsearch.common.xcontent.XContentFactory;
 
+import java.io.IOException;
 import java.util.*;
 
 /**
@@ -27,16 +29,31 @@ public class ElasticSearchBulkProcessor {
 
     // 缓冲池容量(计数,request)
     private static final int MAX_BULK_COUNT = 1000;
+//    private static final int MAX_BULK_COUNT = 2;
     // 缓冲池容量（大小,MB）
-    private static final int MAX_BULK_SIZE = 1;
+    private static final int MAX_BULK_SIZE = 10;
     // 最大提交间隔（秒）
     private static final int MAX_COMMIT_INTERVAL = 60 * 2;
     // 最大并发数量
-    private static final int MAX_CONCURRENT_REQUEST = 2;
+    private static final int MAX_CONCURRENT_REQUEST = 10;
     // 失败重试等待时间 (ms)
-    private static final int REJECT_EXCEPTION_RETRY_WAIT = 500;
+    private static final int REJECT_EXCEPTION_RETRY_WAIT = 1000;
     // 失败重试次数
     private static final int REJECT_EXCEPTION_RETRY_TIMES = 3;
+
+    // The DateTime field name
+    private static final String AIRPURIFIER_FIELD_NAME_DATETIME = "datetime";
+    // The Envirment field name
+    private static final String AIRPURIFIER_FIELD_NAME_ENVIRMENT = "env";
+    // The IDC field name
+    private static final String AIRPURIFIER_FIELD_NAME_IDC = "idc";
+    // The Application field name
+    private static final String AIRPURIFIER_FIELD_NAME_APPLICATION = "app";
+    // The Service field name
+    private static final String AIRPURIFIER_FIELD_NAME_SERVICE = "service";
+    // The HostName field name
+    private static final String AIRPURIFIER_FIELD_NAME_HOSTNAME = "host";
+
 
     static {
         // 2.3.5
@@ -73,20 +90,22 @@ public class ElasticSearchBulkProcessor {
     /**
      * 加入索引请求到缓冲池
      *
-     * @param indexRequest
+//     * @param indexRequest
+     * @param updateRequest
      * @param fieldSet
      */
-    public static void addIndexRequestToBulkProcessor(IndexRequest indexRequest,Set<String> fieldSet) {
+//    public static void addIndexRequestToBulkProcessor(IndexRequest indexRequest,Set<String> fieldSet) {
+    public static void addIndexRequestToBulkProcessor(UpdateRequest updateRequest, Set<String> fieldSet) {
         try {
             // 获取索引及类型信息
-            System.out.println("index:"+indexRequest.index());
-            System.out.println("type:"+indexRequest.type());
+            System.out.println("index:"+updateRequest.index());
+            System.out.println("type:"+updateRequest.type());
 
             // 尝试创建索引,并指定ik中文分词
-            createMapping(indexRequest.index(),indexRequest.type(),fieldSet);
+            createMapping(updateRequest.index(),updateRequest.type(),fieldSet);
 
             // 更新数据
-            bulkProcessor.add(indexRequest);
+            bulkProcessor.add(updateRequest.docAsUpsert(true));
         } catch (Exception ex) {
             ex.printStackTrace();
         }
@@ -113,11 +132,13 @@ public class ElasticSearchBulkProcessor {
                     .startObject("properties") //startObject()_("properties")
 //                    .startObject("id").field("type", "string").field("store", "yes").endObject()
                     ;
-            for(String field : fieldSet){
-                builder = builder.startObject(field).field("type", "string").field("store", "yes")
-//                        .field("analyzer", "ik") // 是否启用分词, 和分词插件名称
-                        .endObject();
-            }
+
+            builder = createType(builder, fieldSet);
+//            for(String field : fieldSet){
+//                builder = builder.startObject(field).field("type", "string").field("store", "yes")
+////                        .field("analyzer", "ik") // 是否启用分词, 和分词插件名称
+//                        .endObject();
+//            }
             builder = builder.endObject(); // endObject()_("properties")
             builder = builder.endObject();   // endObject()_1
 
@@ -146,19 +167,38 @@ public class ElasticSearchBulkProcessor {
                     .startObject()//注意不要加index和type
                     .startObject("_ttl")    // startObject("_ttl")
                     .field("enabled",true)  // 启用索引过期设置
-                    .field("default","1m") // 默认过期时间
+                    .field("default","0") // 默认过期时间
+//                    .field("default","1m") // 默认过期时间
                     .endObject()    // endObject()_("_ttl")
                     .startObject("properties")
                     .startObject("id").field("type", "string").field("store", "yes").endObject();
-            for(String field : fieldSet){
-                builder = builder.startObject(field).field("type", "string").field("store", "yes")
-//                        .field("analyzer", "ik")
-                        .endObject();
-            }
+            builder = createType(builder, fieldSet);
+//            for(String field : fieldSet){
+//                builder = builder.startObject(field).field("type", "string").field("store", "yes")
+////                        .field("analyzer", "ik")
+//                        .endObject();
+//            }
             builder = builder.endObject().endObject();
 
             client.admin().indices().prepareCreate(index).addMapping(mappingType, builder).get();
         }
+    }
+
+    static XContentBuilder createType(XContentBuilder builder, Set<String> fieldSet) throws IOException {
+        for(String field : fieldSet){
+            if (field.equals(AIRPURIFIER_FIELD_NAME_DATETIME)) {
+                builder = builder.startObject(field).field("type", "date").endObject();
+            } else if (field.equals(AIRPURIFIER_FIELD_NAME_ENVIRMENT) ||
+                    field.equals(AIRPURIFIER_FIELD_NAME_IDC) ||
+                    field.equals(AIRPURIFIER_FIELD_NAME_APPLICATION) ||
+                    field.equals(AIRPURIFIER_FIELD_NAME_SERVICE) ||
+                    field.equals(AIRPURIFIER_FIELD_NAME_HOSTNAME)) {
+                builder = builder.startObject(field).field("type", "string").field("analyzer", "keyword").endObject();
+            } else {
+                builder = builder.startObject(field).field("type", "string").field("analyzer", "english").endObject();
+            }
+        }
+        return builder;
     }
 
     public static void test() {

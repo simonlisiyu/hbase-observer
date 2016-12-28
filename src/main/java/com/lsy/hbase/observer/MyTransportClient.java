@@ -16,17 +16,22 @@ public class MyTransportClient {
     public static Settings settings;
     public static Client client;
 
+    private static final String SPLIT_WORD = "--";
+
     static {
         settings = Settings.settingsBuilder()
                 .put("cluster.name", Config.clusterName).build();
         try {
-            TransportAddress[] addresses = new TransportAddress[Config.nodeHost.split("||").length];
-            for(int i=0; i<Config.nodeHost.split("||").length; i++){
-                addresses[i] = new InetSocketTransportAddress(InetAddress.getByName(Config.nodeHost.split("||")[i]), 9300);
+            TransportAddress[] addresses = new TransportAddress[Config.nodeHost.split(SPLIT_WORD).length];
+            for(int i=0; i<Config.nodeHost.split(SPLIT_WORD).length; i++){
+                System.out.println("Config.nodeHost="+Config.nodeHost+", i="+i);
+                addresses[i] = new InetSocketTransportAddress(InetAddress.getByName(Config.nodeHost.split(SPLIT_WORD)[i]), 9300);
             }
             client = TransportClient.builder().settings(settings).build().addTransportAddresses(addresses);
+
+//            System.out.println("Config.nodeHost="+Config.nodeHost);
 //            client = TransportClient.builder().settings(settings).build()
-//                    .addTransportAddress(new InetSocketTransportAddress(InetAddress.getByName("localhost"), 9300))
+//                    .addTransportAddress(new InetSocketTransportAddress(InetAddress.getByName(Config.nodeHost), 9300));
 
         } catch (UnknownHostException e) {
             e.printStackTrace();

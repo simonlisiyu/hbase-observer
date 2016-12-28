@@ -1,16 +1,19 @@
 package com.lsy.hbase.observer;
 
 
+import org.elasticsearch.action.admin.indices.exists.indices.IndicesExistsRequest;
+import org.elasticsearch.action.admin.indices.mapping.put.PutMappingRequest;
 import org.elasticsearch.action.bulk.BulkRequestBuilder;
 import org.elasticsearch.action.bulk.BulkResponse;
 import org.elasticsearch.action.delete.DeleteRequestBuilder;
 import org.elasticsearch.action.update.UpdateRequestBuilder;
 import org.elasticsearch.client.Client;
+import org.elasticsearch.client.Requests;
+import org.elasticsearch.common.xcontent.XContentBuilder;
+import org.elasticsearch.common.xcontent.XContentFactory;
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Timer;
-import java.util.TimerTask;
+import java.io.IOException;
+import java.util.*;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -22,8 +25,8 @@ import java.util.concurrent.locks.ReentrantLock;
 public class ElasticSearchOperator {
 
     // 缓冲池容量
-    private static final int MAX_BULK_COUNT = 2;
-//    private static final int MAX_BULK_COUNT = 1000;
+//    private static final int MAX_BULK_COUNT = 2;
+    private static final int MAX_BULK_COUNT = 1000;
     // 最大提交间隔（秒）
     private static final int MAX_COMMIT_INTERVAL = 60 * 2;
 
@@ -31,6 +34,19 @@ public class ElasticSearchOperator {
     private static BulkRequestBuilder bulkRequestBuilder = null;
 
     private static Lock commitLock = new ReentrantLock();
+
+    // The DateTime field name
+    private static final String AIRPURIFIER_FIELD_NAME_DATETIME = "datetime";
+    // The Envirment field name
+    private static final String AIRPURIFIER_FIELD_NAME_ENVIRMENT = "env";
+    // The IDC field name
+    private static final String AIRPURIFIER_FIELD_NAME_IDC = "idc";
+    // The Application field name
+    private static final String AIRPURIFIER_FIELD_NAME_APPLICATION = "app";
+    // The Service field name
+    private static final String AIRPURIFIER_FIELD_NAME_SERVICE = "service";
+    // The HostName field name
+    private static final String AIRPURIFIER_FIELD_NAME_HOSTNAME = "host";
 
     static {
 
@@ -114,6 +130,67 @@ public class ElasticSearchOperator {
                 commitLock.unlock();
             }
         }
+    }
+
+
+    /**
+     * 创建mapping(feid("indexAnalyzer","ik")该字段分词IK索引 ；feid("searchAnalyzer","ik")该字段分词ik查询；具体分词插件请看IK分词插件说明)
+     * @param index 索引名称；
+     * @param mappingType 索引类型
+     * @param fieldSet 列集合
+     * @throws Exception
+     */
+    public static void createMapping(String index,String mappingType,Set<String> fieldSet)throws Exception{
+        // 判断index是否存在,不存在则创建索引,并启用ik分词器
+        if(client.admin().indices().exists(new IndicesExistsRequest(index)).actionGet().isExists()){
+            System.out.println("index: '"+index+"' already exist!");
+            new XContentFactory();
+            XContentBuilder builder=XContentFactory.jsonBuilder()
+                    .startObject()//注意不要加index和type startObject()_1
+                    .startObject("properties") //startObject()_("properties")
+                    ;
+
+            builder = createType(builder, fieldSet);
+            builder = builder.endObject(); // endObject()_("properties")
+            builder = builder.endObject();   // endObject()_1
+
+            PutMappingRequest mapping = Requests.putMappingRequest(index).type(mappingType).source(builder);
+            client.admin().indices().putMapping(mapping).actionGet();
+        }
+        else {
+            System.out.println("index not exist, create index: '"+index+"'!");
+            new XContentFactory();
+            XContentBuilder builder=XContentFactory.jsonBuilder()
+                    .startObject()//注意不要加index和type
+                    .startObject("_ttl")    // startObject("_ttl")
+                    .field("enabled",true)  // 启用索引过期设置
+                    .field("default","0") // 默认过期时间
+                    .endObject()    // endObject()_("_ttl")
+                    .startObject("properties")
+                    .startObject("id").field("type", "string").field("store", "yes").endObject();
+            builder = createType(builder, fieldSet);
+            builder = builder.endObject().endObject();
+
+            client.admin().indices().prepareCreate(index).addMapping(mappingType, builder).get();
+        }
+    }
+
+    static XContentBuilder createType(XContentBuilder builder, Set<String> fieldSet) throws IOException {
+        for(String field : fieldSet){
+            if (field.equals(AIRPURIFIER_FIELD_NAME_DATETIME)) {
+                System.out.println("date field: '"+field+"'!");
+                builder = builder.startObject(field).field("type", "date").endObject();
+            } else if (field.equals(AIRPURIFIER_FIELD_NAME_ENVIRMENT) ||
+                    field.equals(AIRPURIFIER_FIELD_NAME_IDC) ||
+                    field.equals(AIRPURIFIER_FIELD_NAME_APPLICATION) ||
+                    field.equals(AIRPURIFIER_FIELD_NAME_SERVICE) ||
+                    field.equals(AIRPURIFIER_FIELD_NAME_HOSTNAME)) {
+                builder = builder.startObject(field).field("type", "string").field("analyzer", "keyword").endObject();
+            } else {
+                builder = builder.startObject(field).field("type", "string").field("analyzer", "english").endObject();
+            }
+        }
+        return builder;
     }
 
     private static void test() {
