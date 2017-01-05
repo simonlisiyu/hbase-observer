@@ -53,6 +53,10 @@ public class ElasticSearchBulkProcessor {
     private static final String AIRPURIFIER_FIELD_NAME_SERVICE = "service";
     // The HostName field name
     private static final String AIRPURIFIER_FIELD_NAME_HOSTNAME = "host";
+    // The Service field name
+    private static final String AIRPURIFIER_FIELD_NAME_FILE = "file";
+    // The HostName field name
+    private static final String AIRPURIFIER_FIELD_NAME_PROCESSNAME = "processName";
 
 
     static {
@@ -192,6 +196,8 @@ public class ElasticSearchBulkProcessor {
                     field.equals(AIRPURIFIER_FIELD_NAME_IDC) ||
                     field.equals(AIRPURIFIER_FIELD_NAME_APPLICATION) ||
                     field.equals(AIRPURIFIER_FIELD_NAME_SERVICE) ||
+                    field.equals(AIRPURIFIER_FIELD_NAME_FILE) ||
+                    field.equals(AIRPURIFIER_FIELD_NAME_PROCESSNAME) ||
                     field.equals(AIRPURIFIER_FIELD_NAME_HOSTNAME)) {
                 builder = builder.startObject(field).field("type", "string").field("analyzer", "keyword").endObject();
             } else {

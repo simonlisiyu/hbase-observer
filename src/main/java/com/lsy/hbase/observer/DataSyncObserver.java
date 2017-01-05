@@ -63,19 +63,27 @@ public class DataSyncObserver extends BaseRegionObserver {
     @Override
     public Result postAppend(ObserverContext<RegionCoprocessorEnvironment> e, Append append, Result result) throws IOException {
         try {
+            LOG.info("observer -- append new doc: " + append.getRow() + " to type: " + Config.typeName);
             String indexId = new String(append.getRow());
-            Map<byte[], List<Cell>> familyMap = append.getFamilyCellMap();
-//            NavigableMap<byte[], List<Cell>> familyMap = put.getFamilyCellMap();
-            Map<String, Object> json = new HashMap<String, Object>();
-            for (Map.Entry<byte[], List<Cell>> entry : familyMap.entrySet()) {
-                for (Cell cell : entry.getValue()) {
+            NavigableMap familyMap = append.getFamilyCellMap();
+            HashSet set = new HashSet();
+            HashMap json = new HashMap();
+            Iterator mapIterator = familyMap.entrySet().iterator();
+
+            while(mapIterator.hasNext()) {
+                Map.Entry entry = (Map.Entry)mapIterator.next();
+                Iterator valueIterator = ((List)entry.getValue()).iterator();
+
+                while(valueIterator.hasNext()) {
+                    Cell cell = (Cell)valueIterator.next();
                     String key = Bytes.toString(CellUtil.cloneQualifier(cell));
                     String value = Bytes.toString(CellUtil.cloneValue(cell));
                     json.put(key, value);
+                    set.add(key);
                 }
             }
-//            System.out.println("postAppend");
-            ElasticSearchOperator.addUpdateBuilderToBulk(client.prepareUpdate(Config.indexName, Config.typeName, indexId).setDoc(json).setUpsert(json));
+
+            ElasticSearchBulkProcessor.addIndexRequestToBulkProcessor((new UpdateRequest(Config.indexName, Config.typeName, indexId)).doc(json), set);
             LOG.info("observer -- add new doc: " + indexId + " to type: " + Config.typeName);
         } catch (Exception ex) {
             LOG.error(ex);
